@@ -1,0 +1,113 @@
+library(DESeq2)
+library(Biostrings)
+library(writexl)
+library(tximport)
+library(dplyr)
+library(ggplot2)
+library(ComplexHeatmap)
+library(stringr)
+
+
+tx2gene <- read.csv("ids.csv")
+tx2gene <- tx2gene[, -1]
+head(tx2gene)
+quants_dir <- "salmon_out/2"
+
+quant_files <- list.files(quants_dir, pattern = "quant.sf$", recursive = TRUE, full.names = TRUE)
+
+quant_dirs <- list.files(quants_dir, pattern = "_quant$", full.names = TRUE)
+sample_names <- gsub("_quant$", "", basename(quant_dirs))
+
+names(quant_files) <- sample_names
+
+quant_files
+txi <- tximport(quant_files, type = "salmon", tx2gene = tx2gene)
+condition <- factor(rep(c("NTsh_INF","NTsh_UN","Plin2sh_INF","Plin2sh_UN"),each=3))
+batch <- factor(rep(c("E2","E4","E5"),each=1,4))
+
+coldata <- data.frame(row.names = sample_names, condition, batch)
+coldata
+model.matrix(~ batch + condition, data = coldata)
+
+dds <- DESeqDataSetFromTximport(txi, coldata, ~ batch + condition)
+dds
+des <- estimateSizeFactors(dds)
+dds_norm_counts <- counts(des, normalized = TRUE)
+
+smallestGroupSize <- 3
+keep <- rowSums(dds_norm_counts >= 5) >= smallestGroupSize
+dds <- des[keep,]
+dds$condition <- relevel(dds$condition, ref = "NTsh_UN")
+dds <- DESeq(dds)
+res <- results(dds, contrast = c("condition","NTsh_INF","NTsh_UN"))
+summary(res)
+
+sum(res$pvalue < 0.05, na.rm=TRUE)
+pval <- sum(res$pvalue < 0.05, na.rm=TRUE)
+plotMA(res05, ylim=c(-2,2))
+plotMA(res, ylim = c(-2,2))
+
+idx <- identify(res05$baseMean, res05$log2FoldChange)
+rownames(res05)[idx]
+
+vsd <- vst(dds, blind=FALSE)
+rld <- rlog(dds, blind=FALSE)
+ntd <- normTransform(dds)
+head(assay(vsd), 3)
+
+pcaData <- plotPCA(vsd, intgroup=c("condition", "batch"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=condition, shape=batch)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+
+
+res_omit <- na.omit(res)
+filtered_data <- res_omit[res_omit$pvalue <= 0.05, ]
+down <- filtered_data[filtered_data$log2FoldChange <= -1, ]
+up <- filtered_data[filtered_data$log2FoldChange >= +1, ]
+up <- data.frame(up)
+down <- data.frame(down)
+merged_data <- bind_rows(up, down)
+
+write.csv(merged_data,"NTsh_INF_VS_NTsh2sh_UN.csv")
+
+# Read the previous saved Deseq file, map gene name, and gene type using the gene_name_type.csv file, and merged 
+gnt <- read.csv("gene_name_type.csv")
+gnt <- gnt[, -1]
+m <- read.csv("NTsh_INF_VS_NTsh_UN.csv")
+Merged_data <- merge(gnt, m, by.x = "Gene_ID", by.y = "Gene_ID")
+
+#Remove the duplicated gene using Gene_ID or Gene_name and save the file
+fil_df <- Merged_data[!duplicated(Merged_data$Gene_ID), ]
+
+head(fil_df)
+dim(fil_df)
+write.csv(fil_df, "DEG NTsh_UN_VS_Plin2sh_UN.csv")
+
+mean_values <- rowMeans(counts_matrix)
+std_values <- apply(counts_matrix, 1, sd)
+z_scores <- (counts_matrix - mean_values) / std_values
+
+Z_SCO <- read.csv("dds_norm_z_scores_ntsh_plin2sh.csv")
+Merged <- merge(gnt, Z_SCO, by.x = "Gene_ID", by.y = "Gene_ID")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
