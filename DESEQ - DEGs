@@ -7,7 +7,7 @@ library(ggplot2)
 library(ComplexHeatmap)
 library(stringr)
 
-
+# ids.csv file has both ENST and ENSG IDs
 tx2gene <- read.csv("ids.csv")
 tx2gene <- tx2gene[, -1]
 head(tx2gene)
@@ -24,7 +24,7 @@ quant_files
 txi <- tximport(quant_files, type = "salmon", tx2gene = tx2gene)
 condition <- factor(rep(c("NTsh_INF","NTsh_UN","Plin2sh_INF","Plin2sh_UN"),each=3))
 batch <- factor(rep(c("E2","E4","E5"),each=1,4))
-
+condition <- relevel(condition, ref = "NTsh_UN")
 coldata <- data.frame(row.names = sample_names, condition, batch)
 coldata
 model.matrix(~ batch + condition, data = coldata)
@@ -37,10 +37,11 @@ dds_norm_counts <- counts(des, normalized = TRUE)
 smallestGroupSize <- 3
 keep <- rowSums(dds_norm_counts >= 5) >= smallestGroupSize
 dds <- des[keep,]
-dds$condition <- relevel(dds$condition, ref = "NTsh_UN")
+
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("condition","NTsh_INF","NTsh_UN"))
 summary(res)
+counts_matrix <- counts(dds, normalized = TRUE)
 
 sum(res$pvalue < 0.05, na.rm=TRUE)
 pval <- sum(res$pvalue < 0.05, na.rm=TRUE)
@@ -63,6 +64,17 @@ ggplot(pcaData, aes(PC1, PC2, color=condition, shape=batch)) +
   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
   coord_fixed()
 
+variances <- apply(assay(vsd), 1, var)
+top_1000_var <- order(variances, decreasing = TRUE)[1:1000]
+vsd_subset <- vsd[top_1000_var, ]
+
+pcaData <- plotPCA(vsd_subset, intgroup=c("condition", "batch"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=condition, shape=batch)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
 
 res_omit <- na.omit(res)
 filtered_data <- res_omit[res_omit$pvalue <= 0.05, ]
@@ -93,6 +105,8 @@ z_scores <- (counts_matrix - mean_values) / std_values
 
 Z_SCO <- read.csv("dds_norm_z_scores_ntsh_plin2sh.csv")
 Merged <- merge(gnt, Z_SCO, by.x = "Gene_ID", by.y = "Gene_ID")
+write.csv(fil_df, ("Zscores-gnt NTsh_UN_VS_Plin2sh_UN.csv")
+
 
 
 
