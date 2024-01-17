@@ -1,0 +1,53 @@
+library(DESeq2)
+library(Biostrings)
+library(writexl)
+library(tximport)
+library(dplyr)
+library(ggplot2)
+library(ComplexHeatmap)
+library(stringr)
+
+library(edgeR)
+tx2gene <- read.csv("ids.csv")
+tx2gene <- tx2gene[, -1]
+head(tx2gene)
+quants_dir <- "salmon_out/2"
+
+quant_files <- list.files(quants_dir, pattern = "quant.sf$", recursive = TRUE, full.names = TRUE)
+
+quant_dirs <- list.files(quants_dir, pattern = "_quant$", full.names = TRUE)
+sample_names <- gsub("_quant$", "", basename(quant_dirs))
+
+names(quant_files) <- sample_names
+
+quant_files
+txi <- tximport(quant_files, type = "salmon", tx2gene = tx2gene)
+condition <- factor(rep(c("NTsh_INF","NTsh_UN","Plin2sh_INF","Plin2sh_UN"),each=3))
+condition <- relevel(condition, ref = "NTsh_UN")
+batch <- factor(rep(c("E2","E4","E5"),each=1,4))
+
+coldata <- data.frame(row.names = sample_names, condition, batch)
+coldata
+model.matrix(~ batch + condition, data = coldata)
+
+dds <- DESeqDataSetFromTximport(txi, coldata, ~ batch + condition)
+dds
+raw_counts <- counts(dds)
+cpm <- cpm(raw_counts)
+integer_values <- round(cpm, digits = 0)
+
+dds <- DESeqDataSetFromMatrix(countData = integer_values, 
+                                  colData = coldata, 
+                                  design = ~ batch + condition)  
+vsd <- vst(dds, blind = FALSE)
+
+pcaData <- plotPCA(vsd, intgroup = c("condition", "batch"), returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=condition, shape=batch)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+
+
+assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$batch )
