@@ -10,14 +10,14 @@ ids=("BNTB19" "BNTB20" "BTB26" "BTB27" "BTB28" "BTB29" "BTB30")
 for id in "${ids[@]}"; do 
 
 ##Checking fastqc for files before trimming
-fastqc -t 40 /lustre/muskan.g/run2_fastq_230620/"$id"_R1.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc11
-fastqc -t 40 /lustre/muskan.g/run2_fastq_230620/"$id"_R2.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc11
+fastqc -t 40 /lustre/muskan.g/run2_fastq_230620/"$id"_R1.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc1
+fastqc -t 40 /lustre/muskan.g/run2_fastq_230620/"$id"_R2.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc1
 
   # Specify the input directory containing your paired-end read files
   input_dir=/lustre/muskan.g/run2_fastq_230620
 
   # Specify the output directory for the processed reads
-  output_dir=/lustre/muskan.g/run2_fastq_230620/ttrimmed
+  output_dir=/lustre/muskan.g/run2_fastq_230620/trimmed
 
   # Run Trimmomatic with the input and output file paths for the current sample
   trimmomatic PE -phred33 "${input_dir}"/"${id}"_R1.fastq.gz "${input_dir}"/"${id}"_R2.fastq.gz \
@@ -27,13 +27,13 @@ fastqc -t 40 /lustre/muskan.g/run2_fastq_230620/"$id"_R2.fastq.gz -o /lustre/mus
     echo "Trimming completed!" 
 
   ## Checking fastqc for files after trimming
-  fastqc -t 40 "${output_dir}"/"${id}"_R1.paired.trimmed.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc22
-  fastqc -t 40 "${output_dir}"/"${id}"_R2.paired.trimmed.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc22
+  fastqc -t 40 "${output_dir}"/"${id}"_R1.paired.trimmed.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc2
+  fastqc -t 40 "${output_dir}"/"${id}"_R2.paired.trimmed.fastq.gz -o /lustre/muskan.g/run2_fastq_230620/fastqc2
 
   echo "Quality check after trimming completed!"
 
-multiqc /lustre/muskan.g/run2_fastq_230620/fastqc11 -o /lustre/muskan.g/run2_fastq_230620/multiqc1
-multiqc /lustre/muskan.g/run2_fastq_230620/fastqc22 -o /lustre/muskan.g/run2_fastq_230620/multiqc2
+multiqc /lustre/muskan.g/run2_fastq_230620/fastqc1 -o /lustre/muskan.g/run2_fastq_230620/multiqc1
+multiqc /lustre/muskan.g/run2_fastq_230620/fastqc2 -o /lustre/muskan.g/run2_fastq_230620/multiqc2
 
 #SALMON INDEXING
 curl -O https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_44/gencode.v44.transcripts.fa.gz
@@ -42,7 +42,7 @@ curl -O https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_44/GRC
 grep "^>" <(gunzip -c GRCh38.primary_assembly.genome.fa.gz) | cut -d " " -f 1 > decoys.txt
 sed -i -e 's/>//g' decoys.txt
 
-cat gencode.v44.transcripts.fa.gz GRCh38.primary_assembly.genome.fa.gz > CRCH38_and_decoys.fa.gz
+cat gencode.v44.transcripts.fa.gz GRCh38.primary_assembly.genome.fa.gz > GRCH38_and_decoys.fa.gz
 
 salmon index -t GRCH38_and_decoys.fa.gz -d decoys.txt -p 30 -i GRCh38_salmon_index --gencode
 
@@ -50,7 +50,7 @@ salmon index -t GRCH38_and_decoys.fa.gz -d decoys.txt -p 30 -i GRCh38_salmon_ind
 salmon_index="/lustre/muskan.g/run2_fastq_230620/aaligner/salmon_index/human_salmon_index"
 
 # Specify the path to the "fastq" folder
-fastq_dir="/lustre/muskan.g/run2_fastq_230620/ttrimmed"
+fastq_dir="/lustre/muskan.g/run2_fastq_230620/trimmed"
 
 # Create an array of sample IDs
 ids=("BNTB19" "BNTB20" "BNTB21" "BNTB22" "BTB22" "BTB23" "BTB24" "BTB25" "BTB26" "BTB27" "BTB28" "BTB29" "BTB30")
